@@ -1,0 +1,169 @@
+#  Session 07 – Database Assignment
+**Database Used:** ITI
+**Prepared By:** Omar Mohamed
+**Date:** March 2025
+
+---
+
+##  Questions and SQL Tasks
+
+### 1. Create a new table `TopInstrctors` and insert instructors with salary > 100000
+```sql
+CREATE TABLE TopInstrctors (
+    InstructorId INT,
+    InstructorName NVARCHAR(100),
+    DepartmentID INT,
+    Salary DECIMAL(10, 2)
+);
+
+INSERT INTO TopInstrctors
+SELECT ID, Name, Dept_ID, Salary
+FROM Instructor
+WHERE Salary > 100000;
+```
+
+### 2. Create `NewDepartment` table copied from `Department` table
+```sql
+SELECT * INTO NewDepartment FROM Department;
+```
+
+### 3. Create `NewDeptWithStructureOnly` with same structure as `Department`
+```sql
+SELECT * INTO NewDeptWithStructureOnly FROM Department WHERE 1 = 0;
+```
+
+### 4. Create scalar function `GetConcatenation(string1, string2)`
+```sql
+CREATE FUNCTION GetConcatenation(
+    @string1 NVARCHAR(100),
+    @string2 NVARCHAR(100)
+) RETURNS NVARCHAR(200)
+AS
+BEGIN
+    RETURN CONCAT(@string1, ' ', @string2);
+END;
+-- Type: Scalar Function
+```
+
+### 5. Function `GetTop5GradesAndItsStudentsNames()`
+```sql
+CREATE FUNCTION GetTop5GradesAndItsStudentsNames()
+RETURNS TABLE
+AS
+RETURN
+(
+    SELECT TOP 5 SC.Grade, S.FirstName
+    FROM StudentCourse SC
+    JOIN Student S ON SC.St_Id = S.ID
+    ORDER BY SC.Grade DESC
+);
+-- Type: Inline Table-Valued Function
+```
+
+### 6. Function `BounsForMangersOnly(@InstructorID)`
+**Inline Table Function:**
+```sql
+CREATE FUNCTION BounsForMangersOnly(@InstructorID INT)
+RETURNS TABLE
+AS
+RETURN
+(
+    SELECT I.Name, D.Name AS DepartmentName, I.Salary, I.Salary + (I.Salary * 0.1) AS SalaryWithBounce
+    FROM Instructor I
+    JOIN Department D ON I.ID = D.Manager_ID
+    WHERE I.ID = @InstructorID
+);
+```
+**Multi-Statement Table Function:**
+```sql
+CREATE FUNCTION BounsForMangersOnly_Multi(@InstructorID INT)
+RETURNS @Result TABLE (Name NVARCHAR(100), DepartmentName NVARCHAR(100), Salary DECIMAL(10,2), SalaryWithBounce DECIMAL(10,2))
+AS
+BEGIN
+    IF EXISTS (SELECT * FROM Department WHERE Manager_ID = @InstructorID)
+    BEGIN
+        INSERT INTO @Result
+        SELECT I.Name, D.Name, I.Salary, I.Salary + (I.Salary * 0.1)
+        FROM Instructor I
+        JOIN Department D ON I.ID = D.Manager_ID
+        WHERE I.ID = @InstructorID
+    END
+    ELSE
+    BEGIN
+        INSERT INTO @Result
+        SELECT Name, NULL, NULL, NULL FROM Instructor WHERE ID = @InstructorID
+    END
+    RETURN;
+END;
+```
+
+### 7. What Is View and Why We Use It?
+`A View is a virtual table based on the result-set of an SQL query. It helps simplify complex queries, enhance security, and improve readability.`
+
+### 8. What are The Types of Views?
+- Simple View
+- Complex View
+- Indexed View
+- Encrypted View
+
+### 9. View to select Department Names and all Grades
+**Type:** Complex View
+```sql
+CREATE VIEW DepartmentGradesView AS
+SELECT D.Name AS DepartmentName, SC.Grade
+FROM Department D
+JOIN Instructor I ON D.ID = I.Dept_ID
+JOIN StudentCourse SC ON SC.Ins_Id = I.ID;
+```
+
+### 10. Encrypted view for manager names and topics
+```sql
+CREATE VIEW EncryptedManagerTopics
+WITH ENCRYPTION
+AS
+SELECT I.Name AS ManagerName, T.Name AS TopicName
+FROM Instructor I
+JOIN Department D ON I.ID = D.Manager_ID
+JOIN Instructor_Topic IT ON I.ID = IT.Ins_Id
+JOIN Topic T ON T.ID = IT.Top_Id;
+```
+
+### 11. View for student's full name and course if grade > 50
+```sql
+CREATE VIEW StudentCoursesAbove50 AS
+SELECT CONCAT(S.FirstName, ' ', S.LastName) AS FullName, C.Name AS CourseName
+FROM Student S
+JOIN StudentCourse SC ON S.ID = SC.St_Id
+JOIN Course C ON C.ID = SC.Cr_Id
+WHERE SC.Grade > 50;
+```
+
+### 12. Multi-Statement Table-Valued Function to return values between two integers
+```sql
+CREATE FUNCTION GetNumbersBetween(@Start INT, @End INT)
+RETURNS @Nums TABLE (Number INT)
+AS
+BEGIN
+    DECLARE @i INT = @Start + 1
+    WHILE @i < @End
+    BEGIN
+        INSERT INTO @Nums VALUES(@i)
+        SET @i += 1
+    END
+    RETURN;
+END;
+```
+
+### 13. Scalar function that returns message based on student name info
+```sql
+CREATE FUNCTION CheckStudentName(@StID INT)
+RETURNS NVARCHAR(100)
+AS
+BEGIN
+    DECLARE @First NVARCHAR(50), @Last NVARCHAR(50)
+    SELECT @First = FirstName, @Last = LastName FROM Student WHERE ID = @StID
+    IF @First IS NULL AND @Last IS NULL RETURN 'First name & last name are null'
+    IF @First IS NULL RETURN 'first name is null'
+    IF @Last IS NULL RETURN 'last name is null'
+    RETURN 'First name & last name are not null'
+END;
